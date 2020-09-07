@@ -1,34 +1,38 @@
 % Example Script for PSF Deconvolution
 
 % Load EPI testdata
-load('sampledata.mat');
-imageEPI = data.imageEPI;
+load('sampleData.mat');
+kspData = data.kspData;
 fieldMap = data.fieldMap;
 
 % Set parameters
-params.nx = size(imageEPI,1); params.ny = size(imageEPI,2); 
+params.nx = size(kspData,1); params.ny = size(kspData,2); 
 params.Te = 0.034; params.Ta = 0.15; 
 params.yres = 0.192*1e3/params.nx;
-params.alpha = 5;
-scan.type = 'epi';
-t2star = 0.2;
+params.alpha = 20;
+scan.type = 'ge-epi';
+t2star = 20;
 
 % Reconstruct data
-reconImageZeroFill = zeros(size(imageEPI));
-imageConjFill = zeros(size(imageEPI));
-reconImageConjFill = zeros(size(imageEPI));
+imageDistorted     = zeros(size(kspData));
+reconImageZeroFill = zeros(size(kspData));
+imageConjFill      = zeros(size(kspData));
+reconImageConjFill = zeros(size(kspData));
 
 w = waitbar(0,'Correcting images ...');
-for Nslice = 1:size(imageEPI,3)
-    waitbar(Nslice/size(imageEPI,3), w, 'Correcting images ...');
+for Nslice = 1:size(kspData,3)
+    waitbar(Nslice/size(kspData,3), w, 'Correcting images ...');
     
     % (A) Zerofilling
-    scan.pf = 5/8; scan.pftype = 'zerofill'; scan.direction = 'down';
-    reconImageZeroFill(:,:,Nslice) = PSF_correction_method_patzig(imageEPI(:,:,Nslice), fieldMap(:,:,Nslice), t2star*ones(size(fieldMap(:,:,Nslice))), params, scan);
+    % Transform k-space data to image domain
+    imageDistorted(:,:,Nslice) = fftshift(fftn(ifftshift(kspData(:,:,Nslice))));
+    scan.pf = 0.56; scan.pftype = 'zerofill'; scan.direction = 'down';
+    reconImageZeroFill(:,:,Nslice) = PSF_correction_method_patzig(imageDistorted(:,:,Nslice), fieldMap(:,:,Nslice), t2star*ones(size(fieldMap(:,:,Nslice))), params, scan);
     
     % (B) Conjugatefilling
-    ksp_tmp = ifftshift(ifftn(fftshift(imageEPI(:,:,Nslice))));
-    kspConj = rot90(conj(ksp_tmp),2);
+    % ksp_tmp = ifftshift(ifftn(fftshift(imageEPI(:,:,Nslice))));
+    ksp_tmp = kspData(:,:,Nslice);
+    kspConj = rot90(conj(kspData(:,:,Nslice)),2);
     if strcmp(scan.direction, 'up')
         ksp_tmp(ceil(scan.pf*size(ksp_tmp,1)):end,:) = kspConj(ceil(scan.pf*size(ksp_tmp,1)):end,:);
     elseif strcmp(scan.direction, 'down')
@@ -43,10 +47,13 @@ delete(w);
 
 % Plot Results
 figure
-imagesc(abs([reconImageZeroFill(:,:,Nslice) reconImageConjFill(:,:,Nslice)]))
+imagesc([abs(imageDistorted(:,:,Nslice))/max(max(abs(imageDistorted(:,:,Nslice)))) ...
+         abs(reconImageZeroFill(:,:,Nslice))/max(max(abs(reconImageZeroFill(:,:,Nslice)))) ...
+         abs(reconImageConjFill(:,:,Nslice))/max(max(abs(reconImageConjFill(:,:,Nslice))))])
+title(['Slice ' num2str(Nslice) ': Distorted image - Corrected image (zero filling) - Corrected image (conjugate filling)'])
 colormap(gray); axis image; axis off;
 
-% Example for DEPICTING (not included in the testdata)
+%% Example for DEPICTING (not included in the testdata)
 params.nx = size(imageDEPICTING,1); params.ny = size(imageDEPICTING,2);
 params.Te = 0.005; params.Ta = 0.15; 
 params.yres = 0.192*1e3/params.nx;
