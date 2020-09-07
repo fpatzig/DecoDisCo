@@ -14,7 +14,7 @@ parfor ic1=1:size(image,2)
     end
     if isreal(image)
         PSFmatrix_parfor = abs(PSFmatrix_parfor);
-        PSFmatrix_parfor = PSFmatrix_parfor./repmat(abs(sum(PSFmatrix_parfor)), 162, 1);
+        PSFmatrix_parfor = PSFmatrix_parfor./repmat(abs(sum(PSFmatrix_parfor)), size(image,1), 1);
     end
     
     inv_matrix = invreg(PSFmatrix_parfor, params.alpha);
